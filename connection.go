@@ -1,6 +1,7 @@
 package tcproper
 
 import (
+	"encoding/binary"
 	"net"
 	"time"
 )
@@ -105,6 +106,10 @@ func (c *conn) readLoop() {
 	// create read buffer
 	buf := make([]byte, bufSize)
 
+	var msgLen uint64
+	var msgLenBuf []byte
+	var msg []byte
+
 	for {
 		select {
 		case <-c.Closed():
@@ -128,11 +133,41 @@ func (c *conn) readLoop() {
 			return
 		}
 
-		// write the received message into the read channel
-		select {
-		case c.read <- buf[:n]:
-		case <-c.Closed():
-			return
+		i := 0 // buf read index
+		for {
+			if msgLen == 0 {
+				// we need to parse the message length
+				msgLenBuf = append(msgLenBuf, buf[i])
+
+				if len(msgLenBuf) == 8 {
+					// we have gathered enough bytes to parse
+					// the message length
+					msgLen = binary.BigEndian.Uint64(msgLenBuf)
+					msgLenBuf = nil
+				}
+			} else {
+				msg = append(msg, buf[i])
+				msgLen--
+
+				if msgLen == 0 {
+					// the whole message was read -
+					// write it into the read channel
+					select {
+					case c.read <- msg:
+					case <-c.Closed():
+						return
+					}
+
+					msg = nil
+				}
+			}
+
+			i++
+
+			if i >= n {
+				// we reached the end of the received data
+				break
+			}
 		}
 	}
 }
@@ -146,6 +181,10 @@ func (c *conn) writeLoop() {
 		case <-c.Closed():
 			return
 		case msg := <-c.write:
+			// prepend the length of the message as an uint64
+			lenBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(lenBytes, uint64(len(msg)))
+			msg = append(lenBytes, msg...)
 			if _, err := c.conn.Write(msg); err != nil {
 				c.Close(err)
 				return

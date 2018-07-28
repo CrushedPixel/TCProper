@@ -22,6 +22,8 @@ type Server struct {
 	run         *atomic.Value
 }
 
+// NewServer creates a new TCP server that will listen for connections
+// on the given address.
 func NewServer(addr string) *Server {
 	run := &atomic.Value{}
 	run.Store(false)
@@ -39,6 +41,8 @@ func (s *Server) Connections() <-chan Connection {
 	return s.connections
 }
 
+// Run listens for connections to the server address until ctx is Done.
+// This is a blocking operation.
 func (s *Server) Run(ctx context.Context) error {
 	if s.run.Load().(bool) {
 		return ErrServerAlreadyRun

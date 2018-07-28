@@ -2,6 +2,7 @@ package tcproper
 
 import "net"
 
+// Connect connects to a TCP server at the given address.
 func Connect(addr string) (Connection, error) {
 	// resolve the tcp address
 	raddr, err := net.ResolveTCPAddr("tcp", addr)
