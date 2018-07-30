@@ -16,23 +16,32 @@ const (
 var ErrServerAlreadyRun = errors.New("a server may only be run once")
 
 type Server struct {
-	Addr string
+	laddr   *net.TCPAddr
+	network string
 
 	connections chan Connection
 	run         *atomic.Value
 }
 
-// NewServer creates a new TCP server that will listen for connections
-// on the given address.
-func NewServer(addr string) *Server {
+// NewServer creates a new TCP server that will listen for connections on the given address.
+// The network must be a TCP network name, e.g. "tcp", "tcp4" or "tcp6".
+func NewServer(network string, addr string) (*Server, error) {
 	run := &atomic.Value{}
 	run.Store(false)
 
+	// resolve the tcp address
+	laddr, err := net.ResolveTCPAddr(network, addr)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Server{
-		Addr:        addr,
+		laddr:   laddr,
+		network: network,
+
 		connections: make(chan Connection, channelCapacity),
 		run:         run,
-	}
+	}, nil
 }
 
 // Connections returns a channel receiving incoming connections.
@@ -52,14 +61,8 @@ func (s *Server) Run(ctx context.Context) error {
 	// close the connections channel when Run returns
 	defer close(s.connections)
 
-	// resolve the tcp address
-	laddr, err := net.ResolveTCPAddr("tcp", s.Addr)
-	if err != nil {
-		return err
-	}
-
 	// start listening to incoming tcp connections
-	l, err := net.ListenTCP("tcp", laddr)
+	l, err := net.ListenTCP(s.network, s.laddr)
 	if err != nil {
 		return err
 	}

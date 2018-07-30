@@ -3,15 +3,15 @@ package tcproper
 import "net"
 
 // Connect connects to a TCP server at the given address.
-func Connect(addr string) (Connection, error) {
+func Connect(network string, addr string) (Connection, error) {
 	// resolve the tcp address
-	raddr, err := net.ResolveTCPAddr("tcp", addr)
+	raddr, err := net.ResolveTCPAddr(network, addr)
 	if err != nil {
 		return nil, err
 	}
 
 	// connect to the tcp server
-	conn, err := net.DialTCP("tcp", nil, raddr)
+	conn, err := net.DialTCP(network, nil, raddr)
 	if err != nil {
 		return nil, err
 	}
